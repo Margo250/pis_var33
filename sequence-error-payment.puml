@@ -1,0 +1,31 @@
+@startuml sequence-error-payment
+title Диаграмма последовательности: Ошибка при загрузке файла
+
+actor Admin as A
+participant "Web UI" as UI
+participant "Announcement Service" as AS
+database "PostgreSQL" as DB
+participant "File Storage (S3/MinIO)" as FS
+
+A -> UI: Заполнить поля
+A -> UI: Прикрепить файл и нажать "Опубликовать"
+UI -> AS: POST /api/announcements (with file)
+activate AS
+
+AS -> DB: BEGIN TRANSACTION
+AS -> DB: INSERT INTO announcements (status='PENDING') ...
+DB --> AS: announcement_id
+AS -> FS: PUT /upload (file data)
+activate FS
+FS --> AS: ERROR 500 (Internal Server Error)
+deactivate FS
+note right: Файловое хранилище недоступно
+
+AS -> DB: ROLLBACK
+AS --> UI: 503 Service Unavailable
+deactivate AS
+
+UI --> A: Показать ошибку: "Не удалось загрузить файл. Сервис временно недоступен. Попробуйте позже."
+note right: Транзакция откачена, объявление не создано.
+
+@enduml
