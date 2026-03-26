@@ -1,0 +1,43 @@
+@startuml
+title Диаграмма последовательности: Успешная публикация объявления
+
+actor Admin as A
+participant "Web UI" as UI
+participant "Announcement Service" as AS
+database "PostgreSQL" as DB
+queue "RabbitMQ" as MQ
+participant "Notification Service" as NS
+
+A -> UI: Открыть форму объявления
+UI -> UI: Отобразить форму
+A -> UI: Заполнить поля, прикрепить файл
+A -> UI: Нажать "Опубликовать"
+
+UI -> AS: POST /api/groups/{id}/announcements
+activate AS
+
+AS -> AS: Валидация данных
+AS -> DB: BEGIN TRANSACTION
+AS -> DB: INSERT INTO announcements ...
+DB --> AS: announcement_id
+AS -> DB: COMMIT
+deactivate DB
+
+AS -> MQ: publish(notification_task, announcement_id)
+note right: Асинхронная отправка
+MQ --> AS: ACK
+
+AS --> UI: 201 Created
+deactivate AS
+
+UI --> A: Показать уведомление "Опубликовано"
+
+' Асинхронный поток
+MQ -> NS: consume(notification_task)
+activate NS
+NS -> NS: Собрать список участников группы
+NS -> NS: Сформировать уведомления
+NS --> MQ: ACK
+deactivate NS
+
+@enduml
