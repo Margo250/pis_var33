@@ -1,11 +1,9 @@
 # Архитектура Announcement Service
 
-## Гексагональная архитектура (Ports & Adapters)
-
-### Диаграмма
+## Диаграмма
 
 ```plantuml
-@startuml architecture
+@startuml
 !theme plain
 allowmixing
 
@@ -16,7 +14,6 @@ package "Domain Layer" {
   class "Group" as G
   class "User" as U
   enum "AnnouncementStatus" as S
-  note right of A : Чистая бизнес-логика\nНе знает о фреймворках
 }
 
 package "Application Layer" {
@@ -41,57 +38,59 @@ package "Infrastructure Layer" {
   }
   
   package "Outbound Adapters" {
-    component "InMemory Repository" as InMem
     component "PostgreSQL Repository" as PG
-    component "Console Notifier" as Console
+    component "InMemory Repository" as InMem
     component "RabbitMQ Notifier" as MQ
   }
 }
 
-' Зависимости
-REST ..> CreateUC : вызывает
-REST ..> GetUC : вызывает
+REST ..> CreateUC
+REST ..> GetUC
 
-Service ..|> CreateUC : реализует
-Service ..|> GetUC : реализует
+Service ..|> CreateUC
+Service ..|> GetUC
 
-Service ..> Repo : зависит
-Service ..> Notif : зависит
+Service ..> Repo
+Service ..> Notif
 
-InMem ..|> Repo : реализует
-PG ..|> Repo : реализует
-Console ..|> Notif : реализует
-MQ ..|> Notif : реализует
+PG ..|> Repo
+InMem ..|> Repo
+MQ ..|> Notif
 
-Service --> A : создаёт
-
-note bottom of Service
-  <b>Dependency Rule</b>
-  Infrastructure → Application → Domain
-end note
+Service --> A
 
 @enduml
 ```
+<img width="2387" height="458" alt="architecture" src="https://github.com/user-attachments/assets/8acb3074-b7e0-4053-90be-044690eb0899" />
 
-========== ПОЯСНЕНИЯ ==========
 
-note right of Service
-  <b>Dependency Rule</b>
-  Зависимости направлены ВНУТРЬ
-  Infrastructure → Application → Domain
-  Domain ничего не знает о внешнем мире
-end note
+## Domain Layer
+- Announcement — сущность объявления
+- Group — сущность группы
+- User — сущность пользователя
+- AnnouncementStatus — статусы (DRAFT, SCHEDULED, PUBLISHED, ARCHIVED)
 
-note bottom of REST
-  <b>Входящий адаптер</b>
-  Преобразует HTTP-запросы
-  в вызовы use-case
-end note
+Не зависит от других слоёв.
 
-note bottom of PG
-  <b>Исходящий адаптер</b>
-  Реализует интерфейс репозитория
-  Работает с реальной БД
-end note
+## Application Layer
+Входящие порты:
+- CreateAnnouncementUseCase — создание объявления
+- GetAnnouncementUseCase — получение объявления
+Исходящие порты:
+- AnnouncementRepository — сохранение и загрузка
+- NotificationService — уведомления
 
-@enduml
+Сервис: AnnouncementService реализует входящие порты, зависит от исходящих.
+
+## Infrastructure Layer
+Входящие адаптеры:
+- REST Controller — HTTP-эндпоинты
+Исходящие адаптеры:
+- PostgreSQL Repository — реальная БД
+- InMemory Repository — для тестов
+- RabbitMQ Notifier — очередь уведомлений
+
+## Dependency Rule
+Infrastructure → Application → Domain
+
+Домен не знает о внешнем мире.
